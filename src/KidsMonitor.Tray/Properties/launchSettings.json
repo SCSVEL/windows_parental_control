@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "KidsMonitor.Tray (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "KidsMonitor.Tray (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

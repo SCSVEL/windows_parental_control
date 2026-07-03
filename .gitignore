@@ -1,0 +1,8 @@
+## .NET
+bin/
+obj/
+*.user
+.vs/
+
+## Ralph loop local state
+.claude/ralph-loop.local.md

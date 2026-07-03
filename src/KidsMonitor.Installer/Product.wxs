@@ -1,0 +1,20 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="KidsMonitor" Manufacturer="KidsMonitor" Version="0.1.0.0" UpgradeCode="e94dba21-ed90-4c13-8d3d-48f7493ac7ee">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of KidsMonitor is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="KidsMonitor" />
+    </StandardDirectory>
+
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      <Component Id="PlaceholderComponent" Guid="9b7e2a3e-6b9f-4b7e-9a3b-1e2c3d4f5a6b">
+        <File Source="PLACEHOLDER.txt" />
+      </Component>
+    </ComponentGroup>
+
+    <Feature Id="Main">
+      <ComponentGroupRef Id="ProductComponents" />
+    </Feature>
+  </Package>
+</Wix>

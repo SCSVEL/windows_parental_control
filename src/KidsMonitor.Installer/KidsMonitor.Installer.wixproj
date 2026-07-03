@@ -1,0 +1,8 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+
+  <PropertyGroup>
+    <OutputName>KidsMonitor</OutputName>
+    <Platform>x64</Platform>
+  </PropertyGroup>
+
+</Project>

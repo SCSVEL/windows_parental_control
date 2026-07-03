@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "KidsMonitor.Overlay (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "KidsMonitor.Overlay (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
