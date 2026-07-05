@@ -26,6 +26,12 @@ public sealed partial class MainWindow : Window
 
         RootFrame.Navigate(typeof(MainPage));
 
+        // Activate() must run before the topmost/borderless Win32 styling below: applying
+        // SetWindowPos(HWND_TOPMOST, ...) to a window that hasn't been shown/activated yet
+        // doesn't stick -- the window ends up on screen (right size/position) but without the
+        // WS_EX_TOPMOST bit, so it silently renders behind whatever the child already has open.
+        Activate();
+
         var hwnd = WindowNative.GetWindowHandle(this);
         MakeBorderlessTopmostFullScreen(hwnd);
 

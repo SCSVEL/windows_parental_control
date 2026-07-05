@@ -24,31 +24,62 @@ public sealed class PipeServer(
     LockController lockController,
     ILogger<PipeServer> logger) : BackgroundService
 {
+    // Serializes access to tracker/passwordStore/configStore/lockController across
+    // concurrently-connected clients (see below); each message is handled to completion
+    // before the next one (from any client) starts, so business logic never needs its own locks.
+    private readonly SemaphoreSlim _handlerLock = new(1, 1);
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                using var pipe = CreatePipe();
-
+                var pipe = CreatePipe();
                 await pipe.WaitForConnectionAsync(stoppingToken).ConfigureAwait(false);
                 logger.LogInformation("Pipe client connected");
-                await HandleClientAsync(pipe, stoppingToken).ConfigureAwait(false);
-                logger.LogInformation("Pipe client disconnected");
+
+                // Fire-and-forget: HeartbeatWorker holds its connection open indefinitely, so
+                // awaiting HandleClientAsync here (as before) would leave the accept loop stuck
+                // inside that one connection forever, and every other client (Settings,
+                // FirstRunSetup) would time out trying to connect. Handling each client on its
+                // own task lets the loop immediately create the next pipe instance and accept
+                // the next connection.
+                _ = HandleClientConnectionAsync(pipe, stoppingToken);
             }
             catch (OperationCanceledException)
             {
                 // shutting down
             }
-            catch (IOException ex)
-            {
-                logger.LogWarning(ex, "Pipe client disconnected unexpectedly");
-            }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Unexpected error in pipe server accept loop");
             }
+        }
+    }
+
+    private async Task HandleClientConnectionAsync(NamedPipeServerStream pipe, CancellationToken stoppingToken)
+    {
+        try
+        {
+            await HandleClientAsync(pipe, stoppingToken).ConfigureAwait(false);
+            logger.LogInformation("Pipe client disconnected");
+        }
+        catch (OperationCanceledException)
+        {
+            // shutting down
+        }
+        catch (IOException ex)
+        {
+            logger.LogWarning(ex, "Pipe client disconnected unexpectedly");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Unexpected error handling pipe client");
+        }
+        finally
+        {
+            pipe.Dispose();
         }
     }
 
@@ -151,27 +182,35 @@ public sealed class PipeServer(
                 break;
             }
 
-            switch (envelope.Type)
+            await _handlerLock.WaitAsync(ct).ConfigureAwait(false);
+            try
             {
-                case nameof(ActivityHeartbeat):
-                    await HandleHeartbeatAsync(envelope, writer, ct).ConfigureAwait(false);
-                    break;
+                switch (envelope.Type)
+                {
+                    case nameof(ActivityHeartbeat):
+                        await HandleHeartbeatAsync(envelope, writer, ct).ConfigureAwait(false);
+                        break;
 
-                case nameof(SetPasswordRequest):
-                    await HandleSetPasswordAsync(envelope, pipe, writer, ct).ConfigureAwait(false);
-                    break;
+                    case nameof(SetPasswordRequest):
+                        await HandleSetPasswordAsync(envelope, pipe, writer, ct).ConfigureAwait(false);
+                        break;
 
-                case nameof(SetLimitsRequest):
-                    await HandleSetLimitsAsync(envelope, writer, ct).ConfigureAwait(false);
-                    break;
+                    case nameof(SetLimitsRequest):
+                        await HandleSetLimitsAsync(envelope, writer, ct).ConfigureAwait(false);
+                        break;
 
-                case nameof(UnlockRequest):
-                    await HandleUnlockAsync(envelope, writer, ct).ConfigureAwait(false);
-                    break;
+                    case nameof(UnlockRequest):
+                        await HandleUnlockAsync(envelope, writer, ct).ConfigureAwait(false);
+                        break;
 
-                default:
-                    logger.LogWarning("Ignoring unexpected pipe message type {Type}", envelope.Type);
-                    break;
+                    default:
+                        logger.LogWarning("Ignoring unexpected pipe message type {Type}", envelope.Type);
+                        break;
+                }
+            }
+            finally
+            {
+                _handlerLock.Release();
             }
         }
     }

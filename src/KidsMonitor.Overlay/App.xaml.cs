@@ -38,7 +38,8 @@ public partial class App : Application
     /// <param name="args">Details about the launch request and process.</param>
     protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
     {
+        // MainWindow activates itself in its constructor (see its comment) before applying
+        // the topmost/borderless Win32 styling, so no separate Activate() call is needed here.
         _window = new MainWindow();
-        _window.Activate();
     }
 }

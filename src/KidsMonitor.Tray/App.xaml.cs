@@ -1,4 +1,5 @@
 ﻿using System.Runtime.InteropServices;
+using CommunityToolkit.Mvvm.Input;
 using H.NotifyIcon;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
@@ -19,6 +20,7 @@ public partial class App : Application
     private DispatcherQueue? _dispatcherQueue;
     private FirstRunSetupWindow? _setupWindow;
     private SettingsWindow? _settingsWindow;
+    private Window? _keepAliveWindow;
 
     /// <summary>
     /// Initializes the singleton application object.  This is the first line of authored code
@@ -36,6 +38,21 @@ public partial class App : Application
     protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
     {
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
+
+        // WinUI3 (Windows App SDK) ends the app's message loop -- and the process -- the moment
+        // the last Window is closed, same as it would for a normal windowed app. This app has no
+        // "main window": FirstRunSetupWindow/SettingsWindow are opened on demand and closed by the
+        // user, which would otherwise kill the tray icon along with them. Keeping one Window alive
+        // for the app's whole lifetime (created here, never closed) keeps the process running even
+        // when every user-facing window is closed. Parked off-screen and shrunk to 1x1 rather than
+        // AppWindow.Hide(): Hide() left the window activated-but-invisible in a way that also
+        // blocked later windows (Settings/Setup) from ever coming to the foreground when activated.
+        _keepAliveWindow = new Window();
+        _keepAliveWindow.AppWindow.IsShownInSwitchers = false;
+        _keepAliveWindow.AppWindow.Resize(new Windows.Graphics.SizeInt32(1, 1));
+        _keepAliveWindow.AppWindow.Move(new Windows.Graphics.PointInt32(-32000, -32000));
+        _keepAliveWindow.Activate();
+
         _trayIcon = (TaskbarIcon)Resources["TrayIcon"];
 
         // Set here rather than via IconSource in App.xaml: IconSource resolves through a
@@ -45,8 +62,11 @@ public partial class App : Application
         _trayIcon.Icon = new System.Drawing.Icon(Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico"));
 
         _statusMenuItem = new MenuFlyoutItem { Text = _status.StatusText, IsEnabled = false };
-        var settingsItem = new MenuFlyoutItem { Text = "Settings..." };
-        settingsItem.Click += (_, _) => ShowSettingsWindow();
+        // ContextMenuMode is left at its default (PopupMenu, a native Win32 menu -- see App.xaml),
+        // which invokes each item's bound Command on selection rather than raising the WinUI
+        // Click event (Click only fires for a real XAML flyout, which this isn't). A Click-only
+        // handler here silently never runs when the user picks the item from the native menu.
+        var settingsItem = new MenuFlyoutItem { Text = "Settings...", Command = new RelayCommand(ShowSettingsWindow) };
         _trayIcon.ContextFlyout = new MenuFlyout { Items = { _statusMenuItem, settingsItem } };
 
         _status.PropertyChanged += (_, _) =>
