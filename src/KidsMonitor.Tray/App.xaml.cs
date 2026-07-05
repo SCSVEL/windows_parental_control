@@ -17,6 +17,7 @@ public partial class App : Application
     private HeartbeatWorker? _heartbeatWorker;
     private DispatcherQueue? _dispatcherQueue;
     private FirstRunSetupWindow? _setupWindow;
+    private SettingsWindow? _settingsWindow;
 
     /// <summary>
     /// Initializes the singleton application object.  This is the first line of authored code
@@ -44,7 +45,7 @@ public partial class App : Application
 
         _statusMenuItem = new MenuFlyoutItem { Text = _status.StatusText, IsEnabled = false };
         var settingsItem = new MenuFlyoutItem { Text = "Settings..." };
-        settingsItem.Click += (_, _) => new SettingsWindow(_status.LimitMinutes).Activate();
+        settingsItem.Click += (_, _) => ShowSettingsWindow();
         _trayIcon.ContextFlyout = new MenuFlyout { Items = { _statusMenuItem, settingsItem } };
 
         _status.PropertyChanged += (_, _) =>
@@ -81,5 +82,25 @@ public partial class App : Application
         _setupWindow = new FirstRunSetupWindow();
         _setupWindow.Closed += (_, _) => _setupWindow = null;
         _setupWindow.Activate();
+    }
+
+    private void ShowSettingsWindow()
+    {
+        if (_settingsWindow is not null)
+        {
+            _settingsWindow.Activate();
+            return;
+        }
+
+        try
+        {
+            _settingsWindow = new SettingsWindow(_status.LimitMinutes);
+            _settingsWindow.Closed += (_, _) => _settingsWindow = null;
+            _settingsWindow.Activate();
+        }
+        catch
+        {
+            _settingsWindow = null;
+        }
     }
 }
