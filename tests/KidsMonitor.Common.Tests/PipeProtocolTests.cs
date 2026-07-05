@@ -32,7 +32,7 @@ public class PipeProtocolTests
         using var stream = new MemoryStream();
         await using (var writer = new StreamWriter(stream, leaveOpen: true) { AutoFlush = true })
         {
-            await PipeProtocol.WriteMessageAsync(writer, nameof(StatusUpdate), new StatusUpdate(UsedSeconds: 100, LimitSeconds: 7200));
+            await PipeProtocol.WriteMessageAsync(writer, nameof(StatusUpdate), new StatusUpdate(UsedSeconds: 100, LimitSeconds: 7200, SetupRequired: false));
         }
 
         stream.Position = 0;

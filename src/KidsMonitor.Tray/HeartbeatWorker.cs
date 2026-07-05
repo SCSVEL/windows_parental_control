@@ -45,7 +45,7 @@ public sealed class HeartbeatWorker(StatusViewModel status)
                         var update = JsonSerializer.Deserialize<StatusUpdate>(envelope.Payload);
                         if (update is not null)
                         {
-                            status.UpdateStatus(update.UsedSeconds, update.LimitSeconds);
+                            status.UpdateStatus(update.UsedSeconds, update.LimitSeconds, update.SetupRequired);
                         }
                     }
 

@@ -91,4 +91,37 @@ public class SessionTrackerTests
         Assert.Equal(TimeSpan.Zero, tracker.UsedTime);
         Assert.False(tracker.IsOverLimit);
     }
+
+    [Fact]
+    public void Reset_ClearsUsedTimeAndLiftsOverLimit()
+    {
+        var clock = new FakeTimeProvider();
+        var tracker = new SessionTracker(clock, limit: TimeSpan.FromSeconds(20), idleResetThreshold: TimeSpan.FromSeconds(60));
+
+        tracker.RecordHeartbeat(idle: TimeSpan.Zero);
+        clock.Advance(TimeSpan.FromSeconds(20));
+        tracker.RecordHeartbeat(idle: TimeSpan.Zero);
+        Assert.True(tracker.IsOverLimit);
+
+        tracker.Reset();
+
+        Assert.Equal(TimeSpan.Zero, tracker.UsedTime);
+        Assert.False(tracker.IsOverLimit);
+    }
+
+    [Fact]
+    public void UpdateLimit_ChangesIsOverLimitImmediately()
+    {
+        var clock = new FakeTimeProvider();
+        var tracker = CreateTracker(clock, out _);
+
+        tracker.RecordHeartbeat(idle: TimeSpan.Zero);
+        clock.Advance(TimeSpan.FromMinutes(10));
+        tracker.RecordHeartbeat(idle: TimeSpan.Zero);
+        Assert.False(tracker.IsOverLimit);
+
+        tracker.UpdateLimit(TimeSpan.FromMinutes(5));
+
+        Assert.True(tracker.IsOverLimit);
+    }
 }

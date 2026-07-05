@@ -16,6 +16,7 @@ public partial class App : Application
     private MenuFlyoutItem? _statusMenuItem;
     private HeartbeatWorker? _heartbeatWorker;
     private DispatcherQueue? _dispatcherQueue;
+    private FirstRunSetupWindow? _setupWindow;
 
     /// <summary>
     /// Initializes the singleton application object.  This is the first line of authored code
@@ -36,17 +37,39 @@ public partial class App : Application
         _trayIcon = (TaskbarIcon)Resources["TrayIcon"];
 
         _statusMenuItem = new MenuFlyoutItem { Text = _status.StatusText, IsEnabled = false };
-        _trayIcon.ContextFlyout = new MenuFlyout { Items = { _statusMenuItem } };
+        var changeLimitItem = new MenuFlyoutItem { Text = "Change limit..." };
+        changeLimitItem.Click += (_, _) => new ChangeLimitWindow().Activate();
+        _trayIcon.ContextFlyout = new MenuFlyout { Items = { _statusMenuItem, changeLimitItem } };
 
         _status.PropertyChanged += (_, _) =>
         {
             var text = _status.StatusText;
-            _dispatcherQueue.TryEnqueue(() => _statusMenuItem.Text = text);
+            var setupRequired = _status.SetupRequired;
+            _dispatcherQueue.TryEnqueue(() =>
+            {
+                _statusMenuItem.Text = text;
+                if (setupRequired)
+                {
+                    ShowSetupWindowIfNeeded();
+                }
+            });
         };
 
         _heartbeatWorker = new HeartbeatWorker(_status);
         _heartbeatWorker.Start();
 
         _trayIcon.ForceCreate();
+    }
+
+    private void ShowSetupWindowIfNeeded()
+    {
+        if (_setupWindow is not null)
+        {
+            return;
+        }
+
+        _setupWindow = new FirstRunSetupWindow();
+        _setupWindow.Closed += (_, _) => _setupWindow = null;
+        _setupWindow.Activate();
     }
 }

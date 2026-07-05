@@ -7,8 +7,19 @@ public partial class StatusViewModel : ObservableObject
     [ObservableProperty]
     private string _statusText = "Connecting to KidsMonitor service...";
 
-    public void UpdateStatus(int usedSeconds, int limitSeconds)
+    [ObservableProperty]
+    private bool _setupRequired;
+
+    public void UpdateStatus(int usedSeconds, int limitSeconds, bool setupRequired)
     {
+        SetupRequired = setupRequired;
+
+        if (setupRequired)
+        {
+            StatusText = "Setup required -- see the setup window";
+            return;
+        }
+
         var used = (int)TimeSpan.FromSeconds(usedSeconds).TotalMinutes;
         var limit = (int)TimeSpan.FromSeconds(limitSeconds).TotalMinutes;
         StatusText = $"{used} of {limit} min used today";

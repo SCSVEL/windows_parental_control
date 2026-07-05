@@ -18,13 +18,19 @@ public sealed class SessionTracker
         IdleResetThreshold = idleResetThreshold;
     }
 
-    public TimeSpan Limit { get; }
+    public TimeSpan Limit { get; private set; }
 
     public TimeSpan IdleResetThreshold { get; }
 
     public TimeSpan UsedTime { get; private set; }
 
     public bool IsOverLimit => UsedTime >= Limit;
+
+    /// <summary>Applies a parent-approved limit change (SetLimitsRequest).</summary>
+    public void UpdateLimit(TimeSpan newLimit) => Limit = newLimit;
+
+    /// <summary>Clears accumulated usage after a verified unlock, giving a fresh session.</summary>
+    public void Reset() => UsedTime = TimeSpan.Zero;
 
     /// <summary>
     /// Records a heartbeat carrying the child's current idle time. Elapsed time since the
