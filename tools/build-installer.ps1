@@ -34,4 +34,11 @@ Write-Host "Building the MSI..."
 dotnet build (Join-Path $repoRoot "src\KidsMonitor.Installer\KidsMonitor.Installer.wixproj") -c $Configuration
 if ($LASTEXITCODE -ne 0) { throw "Installer build failed." }
 
-Write-Host "Done. MSI at src\KidsMonitor.Installer\bin\x64\$Configuration\KidsMonitor.msi"
+$msiPath = Join-Path $repoRoot "src\KidsMonitor.Installer\bin\x64\$Configuration\KidsMonitor.msi"
+$zipPath = Join-Path $repoRoot "src\KidsMonitor.Installer\bin\x64\$Configuration\KidsMonitor.zip"
+
+Write-Host "Zipping the MSI for download/distribution..."
+Compress-Archive -Path $msiPath -DestinationPath $zipPath -Force
+
+Write-Host "Done. MSI at $msiPath"
+Write-Host "Zipped download at $zipPath"

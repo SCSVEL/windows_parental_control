@@ -58,6 +58,10 @@ Tray icon + status flyout (remaining time, "I'm a parent" unlock button) via `H.
 
 MSIX is a non-starter regardless of Store plans since it can't install a Windows Service. Use **WiX Toolset v5**: elevation-required MSI that installs binaries under `Program Files\KidsMonitor\`, registers/starts the service (`Account=LocalSystem`, `Start=auto`), adds the `HKLM Run` key for Tray, and cleans up service+registry (but leaves `ProgramData` config) on uninstall. For day-to-day dev iteration before the MSI exists, use `tools\install-service.ps1` (`sc create`) + xcopy deploy.
 
+## Getting the Installer
+
+`tools\build-installer.ps1` publishes Service/Tray/Overlay and builds the MSI, then zips it up as `src\KidsMonitor.Installer\bin\x64\{Configuration}\KidsMonitor.zip` (alongside the raw `KidsMonitor.msi`) so it can be downloaded/shared as a single file — some channels (email, chat, browser downloads) block or warn on raw `.exe`/`.msi` attachments but allow `.zip`. To install: download the zip, extract it, then run `KidsMonitor.msi` (elevation required).
+
 ## Build & Verification Milestones
 
 1. **M0 — Scaffolding:** all projects build; Service installs/starts via `sc create` and logs; Tray shows a bare tray icon. No IPC yet.
