@@ -13,7 +13,8 @@
             </ResourceDictionary.MergedDictionaries>
             <tb:TaskbarIcon x:Key="TrayIcon"
                             ToolTipText="KidsMonitor"
-                            IconSource="Assets/AppIcon.ico" />
+                            IconSource="Assets/AppIcon.ico"
+                            ContextMenuMode="SecondWindow" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>
