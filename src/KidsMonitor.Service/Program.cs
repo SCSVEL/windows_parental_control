@@ -1,4 +1,5 @@
 using KidsMonitor.Service;
+using KidsMonitor.Service.Enforcement;
 using KidsMonitor.Service.Ipc;
 using KidsMonitor.Service.Session;
 using Serilog;
@@ -27,8 +28,25 @@ builder.Services.AddSingleton(sp => new SessionTracker(
     TimeSpan.FromMinutes(limitMinutes),
     TimeSpan.FromSeconds(idleResetSeconds)));
 
+builder.Services.AddSingleton(new EnforcementOptions(ResolveOverlayExecutablePath(builder.Configuration)));
+builder.Services.AddSingleton<LockController>();
+
 builder.Services.AddHostedService<Worker>();
 builder.Services.AddHostedService<PipeServer>();
+builder.Services.AddHostedService<LockEnforcerService>();
 
 var host = builder.Build();
 host.Run();
+
+static string ResolveOverlayExecutablePath(IConfiguration configuration)
+{
+    var sameDirectory = Path.Combine(AppContext.BaseDirectory, "KidsMonitor.Overlay.exe");
+    if (File.Exists(sameDirectory))
+    {
+        return sameDirectory;
+    }
+
+    return configuration.GetValue<string>("Enforcement:OverlayExecutablePath")
+        ?? throw new InvalidOperationException(
+            "Overlay executable not found next to the Service and no Enforcement:OverlayExecutablePath configured.");
+}
