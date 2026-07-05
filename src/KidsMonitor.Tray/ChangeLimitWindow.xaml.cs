@@ -46,7 +46,7 @@ public sealed partial class ChangeLimitWindow : Window
         }
         catch
         {
-            ErrorText.Text = "Could not reach the KidsMonitor service. Make sure it's running.";
+            ErrorText.Text = "Can't connect to the KidsMonitor service. Make sure it's running and try again.";
         }
         finally
         {
