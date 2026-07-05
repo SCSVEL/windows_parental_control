@@ -1,4 +1,5 @@
-﻿using H.NotifyIcon;
+﻿using System.Runtime.InteropServices;
+using H.NotifyIcon;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -34,6 +35,12 @@ public partial class App : Application
     /// <param name="args">Details about the launch request and process.</param>
     protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
     {
+        UnhandledException += (_, e) =>
+        {
+            e.Handled = true;
+            ReportError("UnhandledException", e.Exception);
+        };
+
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
         _trayIcon = (TaskbarIcon)Resources["TrayIcon"];
 
@@ -98,9 +105,34 @@ public partial class App : Application
             _settingsWindow.Closed += (_, _) => _settingsWindow = null;
             _settingsWindow.Activate();
         }
-        catch
+        catch (Exception ex)
         {
             _settingsWindow = null;
+            ReportError("ShowSettingsWindow", ex);
         }
     }
+
+    /// <summary>
+    /// Logs to a user-writable path (Tray runs as the logged-in user, and
+    /// C:\ProgramData\KidsMonitor is ACL-locked to SYSTEM/Administrators by the service) and
+    /// shows a plain Win32 message box, which doesn't depend on WinUI window creation working.
+    /// </summary>
+    private static void ReportError(string context, Exception ex)
+    {
+        try
+        {
+            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KidsMonitor", "logs");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(Path.Combine(dir, "tray.log"), $"{DateTime.Now:O} [{context}] {ex}{Environment.NewLine}");
+        }
+        catch
+        {
+            // Best-effort logging only.
+        }
+
+        MessageBoxW(IntPtr.Zero, $"{context}:\n{ex}", "KidsMonitor", 0);
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int MessageBoxW(IntPtr hWnd, string text, string caption, uint type);
 }

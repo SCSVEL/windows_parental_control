@@ -1,7 +1,30 @@
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui" xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
   <Package Name="KidsMonitor" Manufacturer="KidsMonitor" Version="0.5.0.0" UpgradeCode="e94dba21-ed90-4c13-8d3d-48f7493ac7ee">
     <MajorUpgrade DowngradeErrorMessage="A newer version of KidsMonitor is already installed." />
     <MediaTemplate EmbedCab="yes" />
+
+    <!-- Runs on install, upgrade, and uninstall alike: Tray.exe is a per-user Run-key/
+         service-launched process, and Overlay.exe intentionally resists ordinary close
+         attempts while a lock is showing, so both need TerminateProcess rather than relying
+         on the app to exit itself. Without this, an uninstall while Tray/Overlay are running
+         leaves their files locked (Windows Installer schedules a pending-delete-on-reboot,
+         so files linger) and/or orphaned processes after removal. -->
+    <util:CloseApplication
+        Id="CloseTrayExe"
+        Target="KidsMonitor.Tray.exe"
+        Description="KidsMonitor Tray must close to continue."
+        CloseMessage="yes"
+        Timeout="3"
+        TerminateProcess="1"
+        RebootPrompt="no" />
+    <util:CloseApplication
+        Id="CloseOverlayExe"
+        Target="KidsMonitor.Overlay.exe"
+        Description="KidsMonitor Overlay must close to continue."
+        CloseMessage="yes"
+        Timeout="3"
+        TerminateProcess="1"
+        RebootPrompt="no" />
 
     <Icon Id="AppIcon.ico" SourceFile="..\KidsMonitor.Tray\Assets\AppIcon.ico" />
     <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />
