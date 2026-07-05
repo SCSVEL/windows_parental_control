@@ -36,10 +36,12 @@ builder.Services.AddSingleton(sp => new SessionTracker(
 
 builder.Services.AddSingleton(new EnforcementOptions(ResolveOverlayExecutablePath(builder.Configuration)));
 builder.Services.AddSingleton<LockController>();
+builder.Services.AddSingleton(new TrayLauncherOptions(ResolveTrayExecutablePath()));
 
 builder.Services.AddHostedService<Worker>();
 builder.Services.AddHostedService<PipeServer>();
 builder.Services.AddHostedService<LockEnforcerService>();
+builder.Services.AddHostedService<TrayLauncherService>();
 
 var host = builder.Build();
 host.Run();
@@ -59,4 +61,10 @@ static string ResolveOverlayExecutablePath(IConfiguration configuration)
     return configuration.GetValue<string>("Enforcement:OverlayExecutablePath")
         ?? throw new InvalidOperationException(
             "Overlay executable not found next to the Service and no Enforcement:OverlayExecutablePath configured.");
+}
+
+static string? ResolveTrayExecutablePath()
+{
+    var siblingFolder = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "Tray", "KidsMonitor.Tray.exe"));
+    return File.Exists(siblingFolder) ? siblingFolder : null;
 }

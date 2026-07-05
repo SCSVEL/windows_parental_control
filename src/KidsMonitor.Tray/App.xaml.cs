@@ -36,10 +36,16 @@ public partial class App : Application
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
         _trayIcon = (TaskbarIcon)Resources["TrayIcon"];
 
+        // Set here rather than via IconSource in App.xaml: IconSource resolves through a
+        // ms-appx:/// URI, which needs package identity and reliably crashes (0xc000027b in
+        // Microsoft.UI.Xaml.dll) on ForceCreate() in this unpackaged app. The classic Icon
+        // property loads straight from disk instead.
+        _trayIcon.Icon = new System.Drawing.Icon(Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico"));
+
         _statusMenuItem = new MenuFlyoutItem { Text = _status.StatusText, IsEnabled = false };
-        var changeLimitItem = new MenuFlyoutItem { Text = "Change limit..." };
-        changeLimitItem.Click += (_, _) => new ChangeLimitWindow().Activate();
-        _trayIcon.ContextFlyout = new MenuFlyout { Items = { _statusMenuItem, changeLimitItem } };
+        var settingsItem = new MenuFlyoutItem { Text = "Settings..." };
+        settingsItem.Click += (_, _) => new SettingsWindow(_status.LimitMinutes).Activate();
+        _trayIcon.ContextFlyout = new MenuFlyout { Items = { _statusMenuItem, settingsItem } };
 
         _status.PropertyChanged += (_, _) =>
         {

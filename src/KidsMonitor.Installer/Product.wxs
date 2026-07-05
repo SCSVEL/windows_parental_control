@@ -1,10 +1,16 @@
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
   <Package Name="KidsMonitor" Manufacturer="KidsMonitor" Version="0.4.0.0" UpgradeCode="e94dba21-ed90-4c13-8d3d-48f7493ac7ee">
     <MajorUpgrade DowngradeErrorMessage="A newer version of KidsMonitor is already installed." />
     <MediaTemplate EmbedCab="yes" />
 
     <Icon Id="AppIcon.ico" SourceFile="..\KidsMonitor.Tray\Assets\AppIcon.ico" />
     <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />
+
+    <!-- Gives the install a Welcome/License/Progress/Exit dialog sequence (there was none
+         before: a silent-looking install with no confirmation once it finished) via the
+         stock minimal dialog set. -->
+    <ui:WixUI Id="WixUI_Minimal" />
+    <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
 
     <!--
       Service, Tray, and Overlay each get their own sibling folder rather than one flat
@@ -62,7 +68,10 @@
           Wait="yes" />
     </Component>
 
-    <!-- Split out so the HKLM Run autostart key can attach to it. -->
+    <!-- Split out so the HKLM Run autostart key can attach to it. This only covers subsequent
+         logons/reboots: the Service (KidsMonitor.Service/TrayLauncherService.cs) launches Tray
+         immediately in the active session right after install, reusing the CreateProcessAsUser
+         path already proven for the Overlay (see ProcessLauncher). -->
     <Component Id="TrayExeComponent" Directory="TrayFolder">
       <File Id="TrayExe" Source="$(var.TrayPublishDir)KidsMonitor.Tray.exe" KeyPath="yes" />
       <RegistryValue

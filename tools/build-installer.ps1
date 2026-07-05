@@ -34,4 +34,4 @@ Write-Host "Building the MSI..."
 dotnet build (Join-Path $repoRoot "src\KidsMonitor.Installer\KidsMonitor.Installer.wixproj") -c $Configuration
 if ($LASTEXITCODE -ne 0) { throw "Installer build failed." }
 
-Write-Host "Done. MSI at src\KidsMonitor.Installer\bin\$Configuration\KidsMonitor.msi"
+Write-Host "Done. MSI at src\KidsMonitor.Installer\bin\x64\$Configuration\KidsMonitor.msi"

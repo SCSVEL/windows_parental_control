@@ -10,6 +10,9 @@ public partial class StatusViewModel : ObservableObject
     [ObservableProperty]
     private bool _setupRequired;
 
+    [ObservableProperty]
+    private int _limitMinutes;
+
     public void UpdateStatus(int usedSeconds, int limitSeconds, bool setupRequired)
     {
         SetupRequired = setupRequired;
@@ -22,6 +25,7 @@ public partial class StatusViewModel : ObservableObject
 
         var used = (int)TimeSpan.FromSeconds(usedSeconds).TotalMinutes;
         var limit = (int)TimeSpan.FromSeconds(limitSeconds).TotalMinutes;
+        LimitMinutes = limit;
         StatusText = $"{used} of {limit} min used today";
     }
 

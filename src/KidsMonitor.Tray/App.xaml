@@ -11,10 +11,16 @@
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
                 <!-- Other merged dictionaries here -->
             </ResourceDictionary.MergedDictionaries>
+            <!-- Icon is set in code-behind (App.xaml.cs), not via IconSource here: IconSource
+                 resolves through a ms-appx:/// URI, which needs package identity and reliably
+                 crashes (0xc000027b) in this unpackaged app.
+                 ContextMenuMode intentionally left at its default (PopupMenu, a native Win32
+                 menu) rather than "SecondWindow": SecondWindow renders the menu in a real
+                 transparent WinUI Window, which hits the same 0xc000027b AppWindow/unpackaged
+                 crash documented in the M2 Overlay work (see ProcessLauncher/LockController
+                 history): this was the actual cause of Tray crashing on every launch. -->
             <tb:TaskbarIcon x:Key="TrayIcon"
-                            ToolTipText="KidsMonitor"
-                            IconSource="Assets/AppIcon.ico"
-                            ContextMenuMode="SecondWindow" />
+                            ToolTipText="KidsMonitor" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>
