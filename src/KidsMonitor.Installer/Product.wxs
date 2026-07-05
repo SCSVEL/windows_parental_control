@@ -1,20 +1,97 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
-  <Package Name="KidsMonitor" Manufacturer="KidsMonitor" Version="0.1.0.0" UpgradeCode="e94dba21-ed90-4c13-8d3d-48f7493ac7ee">
+  <Package Name="KidsMonitor" Manufacturer="KidsMonitor" Version="0.4.0.0" UpgradeCode="e94dba21-ed90-4c13-8d3d-48f7493ac7ee">
     <MajorUpgrade DowngradeErrorMessage="A newer version of KidsMonitor is already installed." />
     <MediaTemplate EmbedCab="yes" />
 
+    <Icon Id="AppIcon.ico" SourceFile="..\KidsMonitor.Tray\Assets\AppIcon.ico" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />
+
+    <!--
+      Service, Tray, and Overlay each get their own sibling folder rather than one flat
+      directory, since all three are independently self-contained (.NET + WinAppSDK)
+      publishes, so harvesting them into a single directory would collide on shared
+      framework DLL names. KidsMonitor.Service's ResolveOverlayExecutablePath expects
+      exactly this ..\Overlay\ layout.
+    -->
     <StandardDirectory Id="ProgramFiles64Folder">
-      <Directory Id="INSTALLFOLDER" Name="KidsMonitor" />
+      <Directory Id="INSTALLFOLDER" Name="KidsMonitor">
+        <Directory Id="ServiceFolder" Name="Service" />
+        <Directory Id="TrayFolder" Name="Tray" />
+        <Directory Id="OverlayFolder" Name="Overlay" />
+      </Directory>
     </StandardDirectory>
 
-    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
-      <Component Id="PlaceholderComponent" Guid="9b7e2a3e-6b9f-4b7e-9a3b-1e2c3d4f5a6b">
-        <File Source="PLACEHOLDER.txt" />
-      </Component>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="KidsMonitor" />
+    </StandardDirectory>
+
+    <ComponentGroup Id="ServiceDependencyFiles" Directory="ServiceFolder" Source="$(var.ServicePublishDir)">
+      <Files Include="**">
+        <Exclude Files="KidsMonitor.Service.exe" />
+      </Files>
     </ComponentGroup>
 
-    <Feature Id="Main">
-      <ComponentGroupRef Id="ProductComponents" />
+    <ComponentGroup Id="TrayDependencyFiles" Directory="TrayFolder" Source="$(var.TrayPublishDir)">
+      <Files Include="**">
+        <Exclude Files="KidsMonitor.Tray.exe" />
+      </Files>
+    </ComponentGroup>
+
+    <ComponentGroup Id="OverlayFiles" Directory="OverlayFolder" Source="$(var.OverlayPublishDir)">
+      <Files Include="**" />
+    </ComponentGroup>
+
+    <!-- Split out from the harvested files above so ServiceInstall/ServiceControl can attach to it. -->
+    <Component Id="ServiceExeComponent" Directory="ServiceFolder">
+      <File Id="ServiceExe" Source="$(var.ServicePublishDir)KidsMonitor.Service.exe" KeyPath="yes" />
+      <ServiceInstall
+          Id="ServiceInstaller"
+          Name="KidsMonitorService"
+          DisplayName="KidsMonitor Service"
+          Description="Enforces KidsMonitor screen-time limits. Do not stop -- this is what keeps the lock tamper-resistant."
+          Start="auto"
+          Type="ownProcess"
+          Account="LocalSystem"
+          ErrorControl="normal" />
+      <ServiceControl
+          Id="ServiceController"
+          Name="KidsMonitorService"
+          Start="install"
+          Stop="both"
+          Remove="uninstall"
+          Wait="yes" />
+    </Component>
+
+    <!-- Split out so the HKLM Run autostart key can attach to it. -->
+    <Component Id="TrayExeComponent" Directory="TrayFolder">
+      <File Id="TrayExe" Source="$(var.TrayPublishDir)KidsMonitor.Tray.exe" KeyPath="yes" />
+      <RegistryValue
+          Root="HKLM"
+          Key="Software\Microsoft\Windows\CurrentVersion\Run"
+          Name="KidsMonitorTray"
+          Type="string"
+          Value="[TrayFolder]KidsMonitor.Tray.exe" />
+    </Component>
+
+    <Component Id="ApplicationShortcut" Directory="ApplicationProgramsFolder">
+      <Shortcut
+          Id="TrayShortcut"
+          Name="KidsMonitor"
+          Description="KidsMonitor parental control"
+          Target="[TrayFolder]KidsMonitor.Tray.exe"
+          WorkingDirectory="TrayFolder"
+          Icon="AppIcon.ico" />
+      <RemoveFolder Id="RemoveApplicationProgramsFolder" On="uninstall" />
+      <RegistryValue Root="HKCU" Key="Software\KidsMonitor" Name="ShortcutInstalled" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <Feature Id="Main" Title="KidsMonitor" Level="1">
+      <ComponentGroupRef Id="ServiceDependencyFiles" />
+      <ComponentGroupRef Id="TrayDependencyFiles" />
+      <ComponentGroupRef Id="OverlayFiles" />
+      <ComponentRef Id="ServiceExeComponent" />
+      <ComponentRef Id="TrayExeComponent" />
+      <ComponentRef Id="ApplicationShortcut" />
     </Feature>
   </Package>
 </Wix>

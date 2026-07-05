@@ -58,7 +58,11 @@ public partial class App : Application
         _heartbeatWorker = new HeartbeatWorker(_status);
         _heartbeatWorker.Start();
 
-        _trayIcon.ForceCreate();
+        // Deferred rather than called inline: calling ForceCreate() synchronously during
+        // OnLaunched races WinUI's message pump/WindowsAppSDK bootstrap in Release builds
+        // (0xc000027b fail-fast, intermittent -- Debug's slower startup masks it). Posting
+        // it as a dispatcher callback lets the pump take at least one turn first.
+        _dispatcherQueue.TryEnqueue(() => _trayIcon.ForceCreate());
     }
 
     private void ShowSetupWindowIfNeeded()

@@ -1,2 +1,0 @@
-Installer skeleton for M0. Service/Tray binary harvesting, service registration,
-ACLs, and autostart registry keys land in milestone M4.

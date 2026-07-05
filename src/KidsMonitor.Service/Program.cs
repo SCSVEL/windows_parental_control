@@ -46,10 +46,14 @@ host.Run();
 
 static string ResolveOverlayExecutablePath(IConfiguration configuration)
 {
-    var sameDirectory = Path.Combine(AppContext.BaseDirectory, "KidsMonitor.Overlay.exe");
-    if (File.Exists(sameDirectory))
+    // Installed layout is Program Files\KidsMonitor\{Service,Tray,Overlay}\ as sibling folders
+    // (see KidsMonitor.Installer) -- kept separate rather than one flat folder because the two
+    // self-contained WinUI publishes and the self-contained Worker Service publish would
+    // otherwise collide on shared framework DLL names.
+    var siblingFolder = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "Overlay", "KidsMonitor.Overlay.exe"));
+    if (File.Exists(siblingFolder))
     {
-        return sameDirectory;
+        return siblingFolder;
     }
 
     return configuration.GetValue<string>("Enforcement:OverlayExecutablePath")

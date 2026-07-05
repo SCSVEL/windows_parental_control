@@ -3,6 +3,22 @@
   <PropertyGroup>
     <OutputName>KidsMonitor</OutputName>
     <Platform>x64</Platform>
+
+    <!-- ICE03 misfires on some harvested WinAppSDK/.NET runtime native DLLs that carry
+         non-standard Language IDs in their PE headers; harmless to suppress. -->
+    <SuppressIces>ICE03</SuppressIces>
+
+    <!--
+      Populated by tools\build-installer.ps1, which publishes each app (self-contained,
+      win-x64) before building this project. Not built via ProjectReference auto-harvesting
+      since that WiX feature is still under-documented; explicit publish + fixed paths are
+      more predictable.
+    -->
+    <ServicePublishDir>$(MSBuildThisFileDirectory)..\KidsMonitor.Service\bin\$(Configuration)\net8.0-windows\win-x64\publish\</ServicePublishDir>
+    <TrayPublishDir>$(MSBuildThisFileDirectory)..\KidsMonitor.Tray\bin\$(Configuration)\net8.0-windows10.0.19041.0\win-x64\publish\</TrayPublishDir>
+    <OverlayPublishDir>$(MSBuildThisFileDirectory)..\KidsMonitor.Overlay\bin\$(Configuration)\net8.0-windows10.0.19041.0\win-x64\publish\</OverlayPublishDir>
+
+    <DefineConstants>ServicePublishDir=$(ServicePublishDir);TrayPublishDir=$(TrayPublishDir);OverlayPublishDir=$(OverlayPublishDir)</DefineConstants>
   </PropertyGroup>
 
 </Project>
