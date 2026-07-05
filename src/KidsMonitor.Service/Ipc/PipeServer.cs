@@ -1,5 +1,10 @@
+using System.IO;
 using System.IO.Pipes;
+using System.Runtime.InteropServices;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text.Json;
+using Microsoft.Win32.SafeHandles;
 using KidsMonitor.Common.Ipc;
 using KidsMonitor.Common.Ipc.Messages;
 using KidsMonitor.Service.Enforcement;
@@ -25,12 +30,7 @@ public sealed class PipeServer(
         {
             try
             {
-                using var pipe = new NamedPipeServerStream(
-                    PipeProtocol.PipeName,
-                    PipeDirection.InOut,
-                    maxNumberOfServerInstances: 4,
-                    PipeTransmissionMode.Byte,
-                    PipeOptions.Asynchronous);
+                using var pipe = CreatePipe();
 
                 await pipe.WaitForConnectionAsync(stoppingToken).ConfigureAwait(false);
                 logger.LogInformation("Pipe client connected");
@@ -49,6 +49,92 @@ public sealed class PipeServer(
             {
                 logger.LogError(ex, "Unexpected error in pipe server accept loop");
             }
+        }
+    }
+
+    private const int PIPE_ACCESS_DUPLEX = 0x00000003;
+    private const int FILE_FLAG_OVERLAPPED = 0x40000000;
+    private const int PIPE_TYPE_BYTE = 0x00000000;
+    private const int PIPE_READMODE_BYTE = 0x00000000;
+    private const int PIPE_REJECT_REMOTE_CLIENTS = 0x00000008;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct SECURITY_ATTRIBUTES
+    {
+        public int nLength;
+        public IntPtr lpSecurityDescriptor;
+        public int bInheritHandle;
+    }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr CreateNamedPipeW(
+        string lpName,
+        int dwOpenMode,
+        int dwPipeMode,
+        int nMaxInstances,
+        int nOutBufferSize,
+        int nInBufferSize,
+        int nDefaultTimeOut,
+        ref SECURITY_ATTRIBUTES lpSecurityAttributes);
+
+    /// <summary>
+    /// Without an explicit ACL, Windows gives a pipe created by this LocalSystem service a
+    /// default DACL covering only SYSTEM/Administrators -- Tray and Overlay, running as the
+    /// standard logged-in user, would get Access Denied on connect before the server ever sees
+    /// them (no exception here, no log line, the client just retries forever). The managed
+    /// PipeSecurity type is available inbox, but the constructors/helpers that would let
+    /// NamedPipeServerStream take one directly require the separate
+    /// System.IO.Pipes.AccessControl package, which the .NET 8 SDK on this machine silently
+    /// drops from the compile references (resolved in project.assets.json, never reaches csc --
+    /// a local SDK/NuGet conflict-resolution quirk, not a namespace-availability issue). Calling
+    /// CreateNamedPipeW directly with the PipeSecurity's binary form sidesteps that entirely.
+    /// </summary>
+    private static NamedPipeServerStream CreatePipe()
+    {
+        var pipeSecurity = new PipeSecurity();
+        pipeSecurity.AddAccessRule(new PipeAccessRule(
+            new SecurityIdentifier(WellKnownSidType.AuthenticatedUserSid, null),
+            PipeAccessRights.ReadWrite,
+            AccessControlType.Allow));
+        pipeSecurity.AddAccessRule(new PipeAccessRule(
+            new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null),
+            PipeAccessRights.FullControl,
+            AccessControlType.Allow));
+
+        var descriptorBytes = pipeSecurity.GetSecurityDescriptorBinaryForm();
+        var descriptorHandle = GCHandle.Alloc(descriptorBytes, GCHandleType.Pinned);
+        try
+        {
+            var securityAttributes = new SECURITY_ATTRIBUTES
+            {
+                nLength = Marshal.SizeOf<SECURITY_ATTRIBUTES>(),
+                lpSecurityDescriptor = descriptorHandle.AddrOfPinnedObject(),
+                bInheritHandle = 0,
+            };
+
+            var handle = CreateNamedPipeW(
+                $@"\\.\pipe\{PipeProtocol.PipeName}",
+                PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
+                PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_REJECT_REMOTE_CLIENTS,
+                4,
+                0,
+                0,
+                0,
+                ref securityAttributes);
+            var error = Marshal.GetLastWin32Error();
+
+            var safeHandle = new SafePipeHandle(handle, ownsHandle: true);
+            if (safeHandle.IsInvalid)
+            {
+                safeHandle.Dispose();
+                throw new IOException($"CreateNamedPipeW failed with Win32 error {error}");
+            }
+
+            return new NamedPipeServerStream(PipeDirection.InOut, isAsync: true, isConnected: false, safeHandle);
+        }
+        finally
+        {
+            descriptorHandle.Free();
         }
     }
 
