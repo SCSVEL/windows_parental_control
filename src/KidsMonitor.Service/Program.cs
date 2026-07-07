@@ -24,7 +24,10 @@ builder.Services.AddSerilog();
 
 var configStore = new ConfigStore(Path.Combine(dataDir, "config.json"));
 var limitMinutes = configStore.ReadDailyLimitMinutes() ?? builder.Configuration.GetValue("SessionLimits:DailyLimitMinutes", 120);
-var idleResetSeconds = builder.Configuration.GetValue("SessionLimits:IdleResetSeconds", 60);
+// 180s (3 min) rather than a shorter window: a kid watching a video (average length ~5 min)
+// may not touch the mouse/keyboard at all for a couple of minutes at a stretch, and that should
+// still count as active usage rather than the clock pausing mid-video.
+var idleResetSeconds = builder.Configuration.GetValue("SessionLimits:IdleResetSeconds", 180);
 var breakIntervalMinutes = configStore.ReadBreakIntervalMinutes();
 var breakDurationMinutes = configStore.ReadBreakDurationMinutes();
 
