@@ -40,10 +40,66 @@ public sealed partial class MainWindow : Window
 
         var hwnd = WindowNative.GetWindowHandle(this);
         MakeBorderlessTopmostFullScreen(hwnd);
+        ForceForegroundFocus(hwnd);
 
         _keyboardHook.Install();
         Closed += (_, _) => _keyboardHook.Uninstall();
     }
+
+    /// <summary>
+    /// Activate()/SetWindowPos(HWND_TOPMOST) alone only make the window visually on top --
+    /// Windows' foreground-lock heuristic still denies it real keyboard/foreground focus because
+    /// it was spawned by the Service (CreateProcessAsUser), not by a click from whatever the
+    /// user currently has focused. Symptom without this: the PasswordBox shows a blinking caret
+    /// (WinUI's own "logical focus" renders regardless) but keystrokes go nowhere until the user
+    /// manually clicks the window -- a manual click is explicitly exempt from the restriction.
+    /// AttachThreadInput temporarily joins this thread's input queue with the foreground thread's,
+    /// which is the standard, documented way for a background-launched window to legitimately
+    /// take over as foreground -- appropriate here since seizing the desktop is the entire point
+    /// of this lock screen.
+    /// </summary>
+    private static void ForceForegroundFocus(IntPtr hwnd)
+    {
+        var foregroundWindow = GetForegroundWindow();
+        var foregroundThreadId = GetWindowThreadProcessId(foregroundWindow, out _);
+        var currentThreadId = GetCurrentThreadId();
+
+        var attached = foregroundThreadId != currentThreadId && AttachThreadInput(currentThreadId, foregroundThreadId, true);
+        try
+        {
+            SetForegroundWindow(hwnd);
+            BringWindowToTop(hwnd);
+            SetFocus(hwnd);
+        }
+        finally
+        {
+            if (attached)
+            {
+                AttachThreadInput(currentThreadId, foregroundThreadId, false);
+            }
+        }
+    }
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool BringWindowToTop(IntPtr hWnd);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SetFocus(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetCurrentThreadId();
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
 
     private static void MakeBorderlessTopmostFullScreen(IntPtr hwnd)
     {
