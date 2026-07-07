@@ -1,6 +1,11 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui" xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
   <Package Name="KidsMonitor" Manufacturer="KidsMonitor" Version="0.7.0.0" UpgradeCode="e94dba21-ed90-4c13-8d3d-48f7493ac7ee">
-    <MajorUpgrade DowngradeErrorMessage="A newer version of KidsMonitor is already installed." />
+    <!-- AllowSameVersionUpgrades: without it, reinstalling an MSI built with the same Version
+         (each build gets a fresh auto-generated ProductCode, but Version here is bumped
+         manually, not per-build) is NOT recognized as an upgrade: MSI treats it as a second,
+         unrelated product with the same UpgradeCode, leaving a duplicate entry in "Installed
+         apps" instead of replacing the old one. -->
+    <MajorUpgrade DowngradeErrorMessage="A newer version of KidsMonitor is already installed." AllowSameVersionUpgrades="yes" />
     <MediaTemplate EmbedCab="yes" />
 
     <!-- Runs on install, upgrade, and uninstall alike: Tray.exe is a per-user Run-key/
@@ -8,7 +13,14 @@
          attempts while a lock is showing, so both need TerminateProcess rather than relying
          on the app to exit itself. Without this, an uninstall while Tray/Overlay are running
          leaves their files locked (Windows Installer schedules a pending-delete-on-reboot,
-         so files linger) and/or orphaned processes after removal. -->
+         so files linger) and/or orphaned processes after removal.
+         util:CloseApplication alone doesn't prevent Windows Installer's own built-in Restart
+         Manager "Files In Use" prompt: its custom action is scheduled after InstallValidate
+         (the point where that RM scan happens), so the dialog still appears first and this
+         only cleans up afterward. Killing both processes via taskkill scheduled explicitly
+         Before="InstallValidate" (below) is what actually prevents the prompt; these
+         CloseApplication entries are kept as a harmless secondary safety net (no-op once
+         taskkill has already ended the processes). -->
     <util:CloseApplication
         Id="CloseTrayExe"
         Target="KidsMonitor.Tray.exe"
@@ -25,6 +37,28 @@
         Timeout="3"
         TerminateProcess="1"
         RebootPrompt="no" />
+
+    <!-- Kills Tray.exe and Overlay.exe (single taskkill call, one /IM per image) before
+         InstallValidate runs its Restart Manager file-in-use scan: must be Execute="immediate"
+         since deferred custom actions can't be scheduled that early in the sequence. Runs
+         unconditionally (install, upgrade, and uninstall), which is exactly what's needed since
+         Tray/Overlay are plain user-session processes the Service doesn't manage the lifecycle
+         of; stopping KidsMonitorService (ServiceControl below) does not touch them. -->
+    <SetProperty
+        Id="WixQuietExecCmdLine"
+        Value="&quot;[System64Folder]taskkill.exe&quot; /F /IM KidsMonitor.Tray.exe /IM KidsMonitor.Overlay.exe"
+        Before="KillTrayAndOverlay"
+        Sequence="execute" />
+    <CustomAction
+        Id="KillTrayAndOverlay"
+        BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+        DllEntry="WixQuietExec"
+        Execute="immediate"
+        Return="ignore" />
+
+    <InstallExecuteSequence>
+      <Custom Action="KillTrayAndOverlay" Before="InstallValidate" />
+    </InstallExecuteSequence>
 
     <Icon Id="AppIcon.ico" SourceFile="..\KidsMonitor.Tray\Assets\AppIcon.ico" />
     <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />
