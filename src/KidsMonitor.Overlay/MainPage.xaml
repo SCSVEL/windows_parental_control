@@ -10,12 +10,14 @@
 
     <Grid Background="#FF101010">
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="16" Width="420">
-            <TextBlock Text="Time's up!"
+            <TextBlock x:Name="HeadingText"
+                       Text="Time's up!"
                        FontSize="64"
                        FontWeight="Bold"
                        Foreground="White"
                        HorizontalAlignment="Center" />
-            <TextBlock Text="Your screen time limit has been reached. Ask a parent to unlock."
+            <TextBlock x:Name="SubtitleText"
+                       Text="Your screen time limit has been reached. Ask a parent to unlock."
                        FontSize="24"
                        Foreground="White"
                        HorizontalAlignment="Center"

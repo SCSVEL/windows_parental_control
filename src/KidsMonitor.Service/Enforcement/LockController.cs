@@ -120,7 +120,11 @@ public sealed class LockController(EnforcementOptions options, TimeProvider cloc
                 return;
             }
 
-            if (ProcessLauncher.TryLaunchInActiveSession(options.OverlayExecutablePath, out var processId, out var win32Error))
+            // Tells the Overlay which message to show (break vs. daily-limit); read once at
+            // launch, so a reason upgrade (break -> daily limit) while the Overlay is already
+            // running won't retroactively change its wording until it's next relaunched.
+            var reasonArg = CurrentLockReason == LockReason.Break ? "break" : "limit";
+            if (ProcessLauncher.TryLaunchInActiveSession(options.OverlayExecutablePath, out var processId, out var win32Error, reasonArg))
             {
                 logger.LogInformation("Overlay launched (pid {ProcessId})", processId);
                 try

@@ -16,7 +16,7 @@ internal static class ProcessLauncher
     private const uint SE_PRIVILEGE_ENABLED = 0x00000002;
     private const uint INVALID_SESSION_ID = 0xFFFFFFFF;
 
-    public static bool TryLaunchInActiveSession(string executablePath, out int processId, out int win32Error)
+    public static bool TryLaunchInActiveSession(string executablePath, out int processId, out int win32Error, string? arguments = null)
     {
         processId = 0;
         win32Error = 0;
@@ -56,10 +56,16 @@ internal static class ProcessLauncher
                         lpDesktop = "winsta0\\default",
                     };
 
+                    // CreateProcessW's argv[0] convention: the exe path (quoted, in case of
+                    // spaces like "Program Files") followed by any additional arguments.
+                    var commandLine = arguments is null
+                        ? $"\"{executablePath}\""
+                        : $"\"{executablePath}\" {arguments}";
+
                     var created = CreateProcessAsUser(
                         primaryToken,
                         executablePath,
-                        lpCommandLine: null,
+                        lpCommandLine: commandLine,
                         IntPtr.Zero,
                         IntPtr.Zero,
                         bInheritHandles: false,

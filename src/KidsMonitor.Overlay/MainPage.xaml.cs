@@ -34,6 +34,17 @@ public sealed partial class MainPage : Page
         };
     }
 
+    protected override void OnNavigatedTo(Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)
+    {
+        base.OnNavigatedTo(e);
+
+        if (e.Parameter as string == "break")
+        {
+            HeadingText.Text = "Break time!";
+            SubtitleText.Text = "Take a short break -- this will unlock on its own soon. Ask a parent if you need it sooner.";
+        }
+    }
+
     private async void UnlockButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e) => await TryUnlockAsync();
 
     private async Task TryUnlockAsync()

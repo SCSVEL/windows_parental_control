@@ -24,7 +24,13 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
 
-        RootFrame.Navigate(typeof(MainPage));
+        // The Service passes "break" or "limit" as argv[1] (see LockController/ProcessLauncher)
+        // so MainPage can show the right message; Environment.GetCommandLineArgs() is used
+        // rather than LaunchActivatedEventArgs since this is a plain CreateProcessAsUser launch,
+        // not protocol/file activation.
+        var args = Environment.GetCommandLineArgs();
+        var lockReason = args.Length > 1 ? args[1] : null;
+        RootFrame.Navigate(typeof(MainPage), lockReason);
 
         // Activate() must run before the topmost/borderless Win32 styling below: applying
         // SetWindowPos(HWND_TOPMOST, ...) to a window that hasn't been shown/activated yet
