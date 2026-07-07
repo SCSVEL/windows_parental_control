@@ -24,7 +24,7 @@ public sealed class SessionTracker
 
     public TimeSpan Limit { get; private set; }
 
-    public TimeSpan IdleResetThreshold { get; }
+    public TimeSpan IdleResetThreshold { get; private set; }
 
     /// <summary>How often a mandatory break is enforced (e.g. every 30 minutes of use). Zero/negative disables breaks.</summary>
     public TimeSpan BreakInterval { get; private set; }
@@ -44,6 +44,9 @@ public sealed class SessionTracker
 
     /// <summary>Applies a parent-approved limit change (SetLimitsRequest).</summary>
     public void UpdateLimit(TimeSpan newLimit) => Limit = newLimit;
+
+    /// <summary>Applies a parent-approved idle-reset threshold change (SetLimitsRequest).</summary>
+    public void UpdateIdleResetThreshold(TimeSpan newThreshold) => IdleResetThreshold = newThreshold;
 
     /// <summary>Applies parent-approved break settings (SetLimitsRequest).</summary>
     public void UpdateBreakSettings(TimeSpan interval, TimeSpan duration)

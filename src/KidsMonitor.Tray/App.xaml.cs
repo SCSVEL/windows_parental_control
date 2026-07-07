@@ -115,7 +115,7 @@ public partial class App : Application
 
         try
         {
-            _settingsWindow = new SettingsWindow(_status.LimitMinutes, _status.BreakIntervalMinutes, _status.BreakDurationMinutes);
+            _settingsWindow = new SettingsWindow(_status.LimitMinutes, _status.BreakIntervalMinutes, _status.BreakDurationMinutes, _status.IdleResetSeconds);
             _settingsWindow.Closed += (_, _) => _settingsWindow = null;
             _settingsWindow.Activate();
         }

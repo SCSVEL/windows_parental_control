@@ -230,7 +230,8 @@ public sealed class PipeServer(
             (int)tracker.Limit.TotalSeconds,
             passwordStore.IsSetupRequired,
             (int)tracker.BreakInterval.TotalMinutes,
-            (int)tracker.BreakDuration.TotalMinutes);
+            (int)tracker.BreakDuration.TotalMinutes,
+            (int)tracker.IdleResetThreshold.TotalSeconds);
         await PipeProtocol.WriteMessageAsync(writer, nameof(StatusUpdate), status, ct).ConfigureAwait(false);
     }
 
@@ -277,6 +278,10 @@ public sealed class PipeServer(
         var breakDuration = TimeSpan.FromMinutes(request.BreakDurationMinutes);
         tracker.UpdateBreakSettings(breakInterval, breakDuration);
         configStore.WriteBreakSettings(request.BreakIntervalMinutes, request.BreakDurationMinutes);
+
+        var idleResetThreshold = TimeSpan.FromSeconds(request.IdleResetSeconds);
+        tracker.UpdateIdleResetThreshold(idleResetThreshold);
+        configStore.WriteIdleResetSeconds(request.IdleResetSeconds);
 
         await PipeProtocol.WriteMessageAsync(writer, nameof(OperationResult), new OperationResult(true, null), ct).ConfigureAwait(false);
     }

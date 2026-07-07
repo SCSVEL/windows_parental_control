@@ -19,7 +19,10 @@ public partial class StatusViewModel : ObservableObject
     [ObservableProperty]
     private int _breakDurationMinutes = 10;
 
-    public void UpdateStatus(int usedSeconds, int limitSeconds, bool setupRequired, int breakIntervalMinutes = 0, int breakDurationMinutes = 10)
+    [ObservableProperty]
+    private int _idleResetSeconds = 180;
+
+    public void UpdateStatus(int usedSeconds, int limitSeconds, bool setupRequired, int breakIntervalMinutes = 0, int breakDurationMinutes = 10, int idleResetSeconds = 180)
     {
         SetupRequired = setupRequired;
 
@@ -34,6 +37,7 @@ public partial class StatusViewModel : ObservableObject
         LimitMinutes = limit;
         BreakIntervalMinutes = breakIntervalMinutes;
         BreakDurationMinutes = breakDurationMinutes;
+        IdleResetSeconds = idleResetSeconds;
         StatusText = $"{used} of {limit} min used today";
     }
 

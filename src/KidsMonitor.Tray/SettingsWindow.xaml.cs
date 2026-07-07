@@ -8,7 +8,7 @@ namespace KidsMonitor_Tray;
 /// <summary>Lets a parent change the daily limit and/or password; the Service requires the current password for both.</summary>
 public sealed partial class SettingsWindow : Window
 {
-    public SettingsWindow(int currentLimitMinutes, int currentBreakIntervalMinutes = 0, int currentBreakDurationMinutes = 10)
+    public SettingsWindow(int currentLimitMinutes, int currentBreakIntervalMinutes = 0, int currentBreakDurationMinutes = 10, int currentIdleResetSeconds = 180)
     {
         InitializeComponent();
         if (currentLimitMinutes > 0)
@@ -21,6 +21,11 @@ public sealed partial class SettingsWindow : Window
         {
             BreakDurationBox.Value = currentBreakDurationMinutes;
         }
+
+        if (currentIdleResetSeconds > 0)
+        {
+            IdleResetBox.Value = currentIdleResetSeconds;
+        }
     }
 
     private async void SubmitButton_Click(object sender, RoutedEventArgs e)
@@ -29,6 +34,7 @@ public sealed partial class SettingsWindow : Window
         var limitMinutes = (int)LimitBox.Value;
         var breakIntervalMinutes = (int)BreakIntervalBox.Value;
         var breakDurationMinutes = (int)BreakDurationBox.Value;
+        var idleResetSeconds = (int)IdleResetBox.Value;
         var newPassword = NewPasswordBox.Password;
         var confirmNewPassword = ConfirmNewPasswordBox.Password;
 
@@ -52,7 +58,7 @@ public sealed partial class SettingsWindow : Window
             await using var client = new KidsMonitorPipeClient();
             await client.ConnectAsync(timeoutMs: 3000);
 
-            await client.SendAsync(nameof(SetLimitsRequest), new SetLimitsRequest(password, limitMinutes, breakIntervalMinutes, breakDurationMinutes));
+            await client.SendAsync(nameof(SetLimitsRequest), new SetLimitsRequest(password, limitMinutes, breakIntervalMinutes, breakDurationMinutes, idleResetSeconds));
             var limitsResult = await ReadResultAsync(client);
             if (limitsResult is not { Success: true })
             {
