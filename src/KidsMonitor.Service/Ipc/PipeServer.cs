@@ -297,10 +297,22 @@ public sealed class PipeServer(
         }
 
         // Respond before disengaging -- DisengageLock kills the Overlay process that's likely
-        // the very client we're replying to.
+        // the very client we're replying to. Capture the reason first: DisengageLock clears it.
+        var wasBreakLock = lockController.CurrentLockReason == LockReason.Break;
         await PipeProtocol.WriteMessageAsync(writer, nameof(OperationResult), new OperationResult(true, null), ct).ConfigureAwait(false);
 
-        tracker.Reset();
+        // A password-ended break only resets the break timer, not the day's usage -- the kid
+        // gets credit for time already used today; only ending a daily-limit lock (or the day
+        // rolling over) gives a genuinely fresh session.
+        if (wasBreakLock)
+        {
+            tracker.ResetBreak();
+        }
+        else
+        {
+            tracker.Reset();
+        }
+
         lockController.DisengageLock();
     }
 }
