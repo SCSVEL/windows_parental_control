@@ -13,17 +13,22 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <TextBlock Grid.Row="0" Text="KidsMonitor settings" FontSize="20" FontWeight="Bold" />
 
         <NumberBox x:Name="LimitBox" Grid.Row="1" Header="Daily time limit (minutes)" Value="120" Minimum="1" Maximum="1440" SpinButtonPlacementMode="Inline" />
-        <PasswordBox x:Name="PasswordBox" Grid.Row="2" Header="Current password" PlaceholderText="Enter current password" />
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="12">
+            <NumberBox x:Name="BreakIntervalBox" Header="Break every (minutes, 0 = off)" Value="0" Minimum="0" Maximum="1440" SpinButtonPlacementMode="Inline" Width="170" />
+            <NumberBox x:Name="BreakDurationBox" Header="Break length (minutes)" Value="10" Minimum="1" Maximum="120" SpinButtonPlacementMode="Inline" Width="170" />
+        </StackPanel>
+        <PasswordBox x:Name="PasswordBox" Grid.Row="3" Header="Current password" PlaceholderText="Enter current password" />
 
-        <PasswordBox x:Name="NewPasswordBox" Grid.Row="3" Header="New password (optional)" PlaceholderText="Leave blank to keep the current password" />
-        <PasswordBox x:Name="ConfirmNewPasswordBox" Grid.Row="4" Header="Confirm new password" PlaceholderText="Re-enter the new password" />
+        <PasswordBox x:Name="NewPasswordBox" Grid.Row="4" Header="New password (optional)" PlaceholderText="Leave blank to keep the current password" />
+        <PasswordBox x:Name="ConfirmNewPasswordBox" Grid.Row="5" Header="Confirm new password" PlaceholderText="Re-enter the new password" />
 
-        <StackPanel Grid.Row="5" Orientation="Horizontal" Spacing="12">
+        <StackPanel Grid.Row="6" Orientation="Horizontal" Spacing="12">
             <Button x:Name="SubmitButton" Content="Save" Click="SubmitButton_Click" />
             <TextBlock x:Name="ErrorText" Foreground="Red" VerticalAlignment="Center" TextWrapping="Wrap" />
         </StackPanel>

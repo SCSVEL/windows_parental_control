@@ -2,13 +2,23 @@ using System.Diagnostics;
 
 namespace KidsMonitor.Service.Enforcement;
 
+/// <summary>Why the lock is currently engaged -- determines whether it can auto-lift.</summary>
+public enum LockReason
+{
+    /// <summary>Daily limit reached; only a verified password (or the next day rolling over) lifts it.</summary>
+    DailyLimit,
+
+    /// <summary>A scheduled break; auto-lifts on its own once BreakDuration elapses.</summary>
+    Break,
+}
+
 /// <summary>
 /// Owns the locked/unlocked state: launches the Overlay on the child's interactive desktop,
 /// watches it and respawns it if killed, and toggles the DisableTaskMgr policy for the
 /// duration of the lock. Unlock (password-verified) arrives in a later milestone; for now
 /// DisengageLock exists for symmetry/testing but nothing calls it automatically.
 /// </summary>
-public sealed class LockController(EnforcementOptions options, ILogger<LockController> logger)
+public sealed class LockController(EnforcementOptions options, TimeProvider clock, ILogger<LockController> logger)
 {
     private static readonly TimeSpan WatchdogInterval = TimeSpan.FromSeconds(1);
 
@@ -17,20 +27,35 @@ public sealed class LockController(EnforcementOptions options, ILogger<LockContr
     private CancellationTokenSource? _watchdogCts;
     private Process? _overlayProcess;
     private string? _lockedUserSid;
+    private long _engagedTimestamp;
 
     public bool IsLocked { get; private set; }
 
-    public void EngageLock()
+    public LockReason? CurrentLockReason { get; private set; }
+
+    /// <summary>How long the current lock has been engaged; meaningless when not locked.</summary>
+    public TimeSpan ElapsedSinceEngaged() => clock.GetElapsedTime(_engagedTimestamp);
+
+    public void EngageLock(LockReason reason)
     {
         lock (_gate)
         {
             if (IsLocked)
             {
+                // A daily-limit lock always wins and is no longer eligible to auto-lift, even if
+                // it started life as a break lock (e.g. the limit was hit mid-break).
+                if (reason == LockReason.DailyLimit)
+                {
+                    CurrentLockReason = LockReason.DailyLimit;
+                }
+
                 return;
             }
 
             IsLocked = true;
-            logger.LogInformation("Lock engaged");
+            CurrentLockReason = reason;
+            _engagedTimestamp = clock.GetTimestamp();
+            logger.LogInformation("Lock engaged ({Reason})", reason);
 
             _lockedUserSid = ProcessLauncher.GetActiveSessionUserSid();
             if (_lockedUserSid is not null)
@@ -53,6 +78,7 @@ public sealed class LockController(EnforcementOptions options, ILogger<LockContr
             }
 
             IsLocked = false;
+            CurrentLockReason = null;
             logger.LogInformation("Lock disengaged");
 
             _watchdogCts?.Cancel();

@@ -25,6 +25,8 @@ builder.Services.AddSerilog();
 var configStore = new ConfigStore(Path.Combine(dataDir, "config.json"));
 var limitMinutes = configStore.ReadDailyLimitMinutes() ?? builder.Configuration.GetValue("SessionLimits:DailyLimitMinutes", 120);
 var idleResetSeconds = builder.Configuration.GetValue("SessionLimits:IdleResetSeconds", 60);
+var breakIntervalMinutes = configStore.ReadBreakIntervalMinutes();
+var breakDurationMinutes = configStore.ReadBreakDurationMinutes();
 
 builder.Services.AddSingleton(configStore);
 builder.Services.AddSingleton(new PasswordStore(Path.Combine(dataDir, "password.dat")));
@@ -32,7 +34,9 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton(sp => new SessionTracker(
     sp.GetRequiredService<TimeProvider>(),
     TimeSpan.FromMinutes(limitMinutes),
-    TimeSpan.FromSeconds(idleResetSeconds)));
+    TimeSpan.FromSeconds(idleResetSeconds),
+    TimeSpan.FromMinutes(breakIntervalMinutes),
+    TimeSpan.FromMinutes(breakDurationMinutes)));
 
 builder.Services.AddSingleton(new EnforcementOptions(ResolveOverlayExecutablePath(builder.Configuration)));
 builder.Services.AddSingleton<LockController>();

@@ -14,9 +14,32 @@ public sealed class LockEnforcerService(SessionTracker tracker, LockController l
     {
         while (!stoppingToken.IsCancellationRequested)
         {
+            // Polled here (not just on heartbeats) so the daily reset fires at local midnight
+            // even if Tray isn't sending heartbeats (e.g. machine sitting at a Windows lock
+            // screen overnight) and even across a lock/unlock or logoff/logon.
+            tracker.RolloverIfNewDay();
+
+            if (lockController.IsLocked
+                && lockController.CurrentLockReason == LockReason.Break
+                && lockController.ElapsedSinceEngaged() >= tracker.BreakDuration)
+            {
+                tracker.ResetBreak();
+            }
+
             if (tracker.IsOverLimit)
             {
-                lockController.EngageLock();
+                lockController.EngageLock(LockReason.DailyLimit);
+            }
+            else if (tracker.IsBreakDue)
+            {
+                lockController.EngageLock(LockReason.Break);
+            }
+            else if (lockController.IsLocked)
+            {
+                // Neither condition holds anymore -- either the break's duration just elapsed
+                // above, or the day just rolled over (RolloverIfNewDay reset UsedTime), so this
+                // lock (break or daily-limit) can lift without a password.
+                lockController.DisengageLock();
             }
 
             try

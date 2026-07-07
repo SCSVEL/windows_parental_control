@@ -8,12 +8,18 @@ namespace KidsMonitor_Tray;
 /// <summary>Lets a parent change the daily limit and/or password; the Service requires the current password for both.</summary>
 public sealed partial class SettingsWindow : Window
 {
-    public SettingsWindow(int currentLimitMinutes)
+    public SettingsWindow(int currentLimitMinutes, int currentBreakIntervalMinutes = 0, int currentBreakDurationMinutes = 10)
     {
         InitializeComponent();
         if (currentLimitMinutes > 0)
         {
             LimitBox.Value = currentLimitMinutes;
+        }
+
+        BreakIntervalBox.Value = currentBreakIntervalMinutes;
+        if (currentBreakDurationMinutes > 0)
+        {
+            BreakDurationBox.Value = currentBreakDurationMinutes;
         }
     }
 
@@ -21,6 +27,8 @@ public sealed partial class SettingsWindow : Window
     {
         var password = PasswordBox.Password;
         var limitMinutes = (int)LimitBox.Value;
+        var breakIntervalMinutes = (int)BreakIntervalBox.Value;
+        var breakDurationMinutes = (int)BreakDurationBox.Value;
         var newPassword = NewPasswordBox.Password;
         var confirmNewPassword = ConfirmNewPasswordBox.Password;
 
@@ -44,7 +52,7 @@ public sealed partial class SettingsWindow : Window
             await using var client = new KidsMonitorPipeClient();
             await client.ConnectAsync(timeoutMs: 3000);
 
-            await client.SendAsync(nameof(SetLimitsRequest), new SetLimitsRequest(password, limitMinutes));
+            await client.SendAsync(nameof(SetLimitsRequest), new SetLimitsRequest(password, limitMinutes, breakIntervalMinutes, breakDurationMinutes));
             var limitsResult = await ReadResultAsync(client);
             if (limitsResult is not { Success: true })
             {

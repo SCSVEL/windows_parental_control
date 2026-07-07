@@ -225,7 +225,12 @@ public sealed class PipeServer(
 
         tracker.RecordHeartbeat(TimeSpan.FromSeconds(heartbeat.IdleSeconds));
 
-        var status = new StatusUpdate((int)tracker.UsedTime.TotalSeconds, (int)tracker.Limit.TotalSeconds, passwordStore.IsSetupRequired);
+        var status = new StatusUpdate(
+            (int)tracker.UsedTime.TotalSeconds,
+            (int)tracker.Limit.TotalSeconds,
+            passwordStore.IsSetupRequired,
+            (int)tracker.BreakInterval.TotalMinutes,
+            (int)tracker.BreakDuration.TotalMinutes);
         await PipeProtocol.WriteMessageAsync(writer, nameof(StatusUpdate), status, ct).ConfigureAwait(false);
     }
 
@@ -267,6 +272,11 @@ public sealed class PipeServer(
         var newLimit = TimeSpan.FromMinutes(request.DailyLimitMinutes);
         tracker.UpdateLimit(newLimit);
         configStore.WriteDailyLimitMinutes(request.DailyLimitMinutes);
+
+        var breakInterval = TimeSpan.FromMinutes(request.BreakIntervalMinutes);
+        var breakDuration = TimeSpan.FromMinutes(request.BreakDurationMinutes);
+        tracker.UpdateBreakSettings(breakInterval, breakDuration);
+        configStore.WriteBreakSettings(request.BreakIntervalMinutes, request.BreakDurationMinutes);
 
         await PipeProtocol.WriteMessageAsync(writer, nameof(OperationResult), new OperationResult(true, null), ct).ConfigureAwait(false);
     }

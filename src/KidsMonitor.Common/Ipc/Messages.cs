@@ -9,9 +9,9 @@ public sealed record ActivityHeartbeat(int IdleSeconds);
 /// <summary>
 /// Server's reply to a heartbeat: current accumulated usage vs. the configured limit, and
 /// whether no password has been set yet (Tray must show the first-run setup wizard instead
-/// of the normal flyout).
+/// of the normal flyout). BreakIntervalMinutes is 0 when breaks are disabled.
 /// </summary>
-public sealed record StatusUpdate(int UsedSeconds, int LimitSeconds, bool SetupRequired);
+public sealed record StatusUpdate(int UsedSeconds, int LimitSeconds, bool SetupRequired, int BreakIntervalMinutes = 0, int BreakDurationMinutes = 10);
 
 /// <summary>
 /// Sets the password. CurrentPassword must be null and the connecting pipe client's token must
@@ -21,8 +21,11 @@ public sealed record StatusUpdate(int UsedSeconds, int LimitSeconds, bool SetupR
 /// </summary>
 public sealed record SetPasswordRequest(string? CurrentPassword, string NewPassword);
 
-/// <summary>Changes the daily limit; always requires the current password.</summary>
-public sealed record SetLimitsRequest(string CurrentPassword, int DailyLimitMinutes);
+/// <summary>
+/// Changes the daily limit and/or the break schedule; always requires the current password.
+/// BreakIntervalMinutes of 0 disables mandatory breaks.
+/// </summary>
+public sealed record SetLimitsRequest(string CurrentPassword, int DailyLimitMinutes, int BreakIntervalMinutes = 0, int BreakDurationMinutes = 10);
 
 /// <summary>Sent by the Overlay to attempt to lift the lock.</summary>
 public sealed record UnlockRequest(string Password);
