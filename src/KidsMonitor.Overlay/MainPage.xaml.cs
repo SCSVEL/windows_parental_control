@@ -1,6 +1,7 @@
 using System.Text.Json;
 using KidsMonitor.Common.Ipc;
 using KidsMonitor.Common.Ipc.Messages;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Windows.System;
@@ -19,6 +20,10 @@ public sealed partial class MainPage : Page
     public MainPage()
     {
         InitializeComponent();
+
+        // So a parent can start typing the password immediately without having to click into
+        // the field first -- this is a full-screen lock screen, there's nothing else to click.
+        Loaded += (_, _) => PasswordBox.Focus(FocusState.Programmatic);
 
         PasswordBox.KeyDown += (_, e) =>
         {
