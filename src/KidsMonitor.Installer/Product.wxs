@@ -1,5 +1,5 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui" xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
-  <Package Name="KidsMonitor" Manufacturer="KidsMonitor" Version="0.9.0.0" UpgradeCode="e94dba21-ed90-4c13-8d3d-48f7493ac7ee">
+  <Package Name="KidsMonitor" Manufacturer="KidsMonitor" Version="0.10.0.0" UpgradeCode="e94dba21-ed90-4c13-8d3d-48f7493ac7ee">
     <!-- AllowSameVersionUpgrades: without it, reinstalling an MSI built with the same Version
          (each build gets a fresh auto-generated ProductCode, but Version here is bumped
          manually, not per-build) is NOT recognized as an upgrade: MSI treats it as a second,
