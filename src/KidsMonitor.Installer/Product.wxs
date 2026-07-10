@@ -123,6 +123,19 @@
           Stop="both"
           Remove="uninstall"
           Wait="yes" />
+      <!-- Without this, an unhandled exception in any BackgroundService (the Generic Host's
+           default BackgroundServiceExceptionBehavior is StopHost, so one bad tick anywhere
+           stops the whole process) leaves the Service dead until the next reboot, with no one
+           left to run the daily reset or lift a lock overnight. SC_ACTION_RESTART on all three
+           failures, reset after a day of continuous uptime so a crash loop doesn't retry
+           forever. -->
+      <util:ServiceConfig
+          ServiceName="KidsMonitorService"
+          FirstFailureActionType="restart"
+          SecondFailureActionType="restart"
+          ThirdFailureActionType="restart"
+          RestartServiceDelayInSeconds="5"
+          ResetPeriodInDays="1" />
     </Component>
 
     <!-- Split out so the HKLM Run autostart key can attach to it. This only covers subsequent

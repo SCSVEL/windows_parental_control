@@ -40,6 +40,11 @@ if ($existing) {
 Write-Host "Creating service '$serviceName' -> $exePath"
 sc.exe create $serviceName binPath= "`"$exePath`"" start= auto obj= LocalSystem | Out-Null
 
+# Matches the MSI's util:ServiceConfig: restart on crash so an unhandled exception in any
+# BackgroundService (which stops the whole host by default) doesn't leave the Service dead
+# until the next reboot.
+sc.exe failure $serviceName reset= 86400 actions= restart/5000/restart/5000/restart/5000 | Out-Null
+
 Write-Host "Starting service '$serviceName'..."
 Start-Service -Name $serviceName
 
