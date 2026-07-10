@@ -55,11 +55,19 @@ public sealed class SessionTracker
         BreakDuration = duration;
     }
 
-    /// <summary>Clears accumulated usage after a verified unlock, giving a fresh session.</summary>
+    /// <summary>
+    /// Clears accumulated usage after a verified unlock, giving a fresh session. Also clears the
+    /// heartbeat baseline: whoever triggers a reset (this call, RolloverIfNewDay, etc.) may not
+    /// be the next thing to call RecordHeartbeat, so the baseline must not survive the reset --
+    /// otherwise the next heartbeat would fold whatever gap elapsed since the *pre-reset* baseline
+    /// into the fresh usage (e.g. LockEnforcerService's 1s poll rolls the day over first, then
+    /// Tray's heartbeat arrives with a baseline from hours earlier, before an overnight sleep).
+    /// </summary>
     public void Reset()
     {
         UsedTime = TimeSpan.Zero;
         UsedSinceBreak = TimeSpan.Zero;
+        _lastHeartbeatTimestamp = null;
     }
 
     /// <summary>Clears just the break timer, e.g. once a break's duration has elapsed.</summary>
@@ -86,24 +94,29 @@ public sealed class SessionTracker
 
     /// <summary>
     /// Records a heartbeat carrying the child's current idle time. Elapsed time since the
-    /// previous heartbeat is added to UsedTime only if the reported idle time is still under
-    /// the reset threshold (i.e. the user was continuously active in between).
+    /// previous heartbeat is added to UsedTime only if (a) the reported idle time is still under
+    /// the reset threshold -- i.e. the child looks active right now -- AND (b) the gap since the
+    /// previous heartbeat is also under the threshold. (b) matters because heartbeats can stop
+    /// arriving for reasons that have nothing to do with the child being continuously active --
+    /// system sleep/hibernate, the Service being restarted, Tray losing its pipe connection --
+    /// and a low *current* idle reading only proves the child touched the input devices recently,
+    /// not that they were active for the whole gap. Without this, waking a machine that slept for
+    /// hours would fold the entire sleep duration into UsedTime as if it were active use.
     /// </summary>
     public void RecordHeartbeat(TimeSpan idle)
     {
-        // If this call itself is the one crossing midnight (e.g. heartbeats had stopped
-        // arriving for a while and this is the first one since), _lastHeartbeatTimestamp is
-        // stale from before the reset -- treat it like the very first heartbeat of the new day
-        // rather than folding that whole pre-reset gap into the fresh UsedTime.
-        var rolledOver = RolloverIfNewDay();
+        RolloverIfNewDay();
 
         var now = _clock.GetTimestamp();
 
-        if (!rolledOver && _lastHeartbeatTimestamp is long last && idle < IdleResetThreshold)
+        if (_lastHeartbeatTimestamp is long last)
         {
             var elapsed = _clock.GetElapsedTime(last, now);
-            UsedTime += elapsed;
-            UsedSinceBreak += elapsed;
+            if (idle < IdleResetThreshold && elapsed < IdleResetThreshold)
+            {
+                UsedTime += elapsed;
+                UsedSinceBreak += elapsed;
+            }
         }
 
         _lastHeartbeatTimestamp = now;

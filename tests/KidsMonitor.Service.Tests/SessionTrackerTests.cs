@@ -11,6 +11,25 @@ public class SessionTrackerTests
         return new SessionTracker(clock, limit, idleResetThreshold: TimeSpan.FromSeconds(60));
     }
 
+    /// <summary>
+    /// Stands in for a real Tray sending a heartbeat every few seconds: advances the clock and
+    /// calls RecordHeartbeat repeatedly in small steps (always under the idle-reset threshold, so
+    /// each step is trusted) until <paramref name="duration"/> has elapsed, rather than a single
+    /// large Advance() -- which after the heartbeat-gap safeguard would no longer be trusted as
+    /// continuous use (see RecordHeartbeat_AfterLongGapSameDay_DoesNotCountTheGapAsUsage).
+    /// </summary>
+    private static void SimulateActiveUse(SessionTracker tracker, FakeTimeProvider clock, TimeSpan duration, TimeSpan step)
+    {
+        var remaining = duration;
+        while (remaining > TimeSpan.Zero)
+        {
+            var advance = remaining < step ? remaining : step;
+            clock.Advance(advance);
+            tracker.RecordHeartbeat(idle: TimeSpan.Zero);
+            remaining -= advance;
+        }
+    }
+
     [Fact]
     public void FirstHeartbeat_DoesNotAccumulateTime()
     {
@@ -116,8 +135,7 @@ public class SessionTrackerTests
         var tracker = CreateTracker(clock, out _);
 
         tracker.RecordHeartbeat(idle: TimeSpan.Zero);
-        clock.Advance(TimeSpan.FromMinutes(10));
-        tracker.RecordHeartbeat(idle: TimeSpan.Zero);
+        SimulateActiveUse(tracker, clock, TimeSpan.FromMinutes(10), TimeSpan.FromSeconds(30));
         Assert.False(tracker.IsOverLimit);
 
         tracker.UpdateLimit(TimeSpan.FromMinutes(5));
@@ -132,8 +150,7 @@ public class SessionTrackerTests
         var tracker = CreateTracker(clock, out _);
 
         tracker.RecordHeartbeat(idle: TimeSpan.Zero);
-        clock.Advance(TimeSpan.FromMinutes(10));
-        tracker.RecordHeartbeat(idle: TimeSpan.Zero);
+        SimulateActiveUse(tracker, clock, TimeSpan.FromMinutes(10), TimeSpan.FromSeconds(30));
 
         var rolledOver = tracker.RolloverIfNewDay();
 
@@ -149,8 +166,7 @@ public class SessionTrackerTests
         var tracker = CreateTracker(clock, out _);
 
         tracker.RecordHeartbeat(idle: TimeSpan.Zero);
-        clock.Advance(TimeSpan.FromMinutes(70));
-        tracker.RecordHeartbeat(idle: TimeSpan.Zero);
+        SimulateActiveUse(tracker, clock, TimeSpan.FromMinutes(70), TimeSpan.FromSeconds(30));
         Assert.Equal(TimeSpan.FromMinutes(70), tracker.UsedTime);
 
         // Simulate the machine sitting locked/idle overnight, crossing local midnight, with no
@@ -171,13 +187,61 @@ public class SessionTrackerTests
         var tracker = new SessionTracker(clock, limit: TimeSpan.FromMinutes(20), idleResetThreshold: TimeSpan.FromSeconds(60));
 
         tracker.RecordHeartbeat(idle: TimeSpan.Zero);
-        clock.Advance(TimeSpan.FromMinutes(15));
-        tracker.RecordHeartbeat(idle: TimeSpan.Zero);
+        SimulateActiveUse(tracker, clock, TimeSpan.FromMinutes(15), TimeSpan.FromSeconds(30));
         Assert.True(tracker.UsedTime >= TimeSpan.FromMinutes(15));
 
         // Heartbeats stopped arriving for a stretch that happens to cross local midnight; the
         // very next heartbeat must not fold that entire stale gap into the new day's usage.
         clock.Advance(TimeSpan.FromHours(24));
+        tracker.RecordHeartbeat(idle: TimeSpan.Zero);
+
+        Assert.False(tracker.IsOverLimit);
+        Assert.Equal(TimeSpan.Zero, tracker.UsedTime);
+    }
+
+    [Fact]
+    public void RecordHeartbeat_AfterLongGapSameDay_DoesNotCountTheGapAsUsage()
+    {
+        var clock = new FakeTimeProvider();
+        clock.SetUtcNow(new DateTimeOffset(2024, 1, 1, 12, 0, 0, TimeSpan.Zero)); // noon, nowhere near midnight
+        var tracker = new SessionTracker(clock, limit: TimeSpan.FromMinutes(20), idleResetThreshold: TimeSpan.FromSeconds(60));
+
+        tracker.RecordHeartbeat(idle: TimeSpan.Zero);
+        clock.Advance(TimeSpan.FromSeconds(10));
+        tracker.RecordHeartbeat(idle: TimeSpan.Zero);
+        Assert.Equal(TimeSpan.FromSeconds(10), tracker.UsedTime);
+
+        // Heartbeats stop arriving for 2 hours mid-day (e.g. laptop lid closed for a nap) -- no
+        // midnight crossed, so RolloverIfNewDay/Reset never fires. The child then touches the
+        // machine to wake it, so the *current* idle reading is low again -- but that only proves
+        // they're active now, not that they were active for the whole 2-hour gap.
+        clock.Advance(TimeSpan.FromHours(2));
+        tracker.RecordHeartbeat(idle: TimeSpan.Zero);
+
+        Assert.Equal(TimeSpan.FromSeconds(10), tracker.UsedTime);
+        Assert.False(tracker.IsOverLimit);
+    }
+
+    [Fact]
+    public void RecordHeartbeat_AfterPollAlreadyRolledOverDay_DoesNotCountTheGapAsUsage()
+    {
+        var clock = new FakeTimeProvider();
+        var tracker = new SessionTracker(clock, limit: TimeSpan.FromMinutes(20), idleResetThreshold: TimeSpan.FromSeconds(60));
+
+        tracker.RecordHeartbeat(idle: TimeSpan.Zero);
+        SimulateActiveUse(tracker, clock, TimeSpan.FromMinutes(15), TimeSpan.FromSeconds(30));
+        Assert.True(tracker.UsedTime >= TimeSpan.FromMinutes(15));
+
+        // Simulates LockEnforcerService's independent 1s poll crossing midnight (e.g. overnight
+        // sleep) and rolling the day over on its own, *before* the next heartbeat arrives -- this
+        // is the common case in production, since the poll runs every second regardless of
+        // whether Tray is even connected.
+        clock.Advance(TimeSpan.FromHours(24));
+        var rolledOverByPoll = tracker.RolloverIfNewDay();
+        Assert.True(rolledOverByPoll);
+
+        // The heartbeat's own RolloverIfNewDay() call is now a same-day no-op, so it must not
+        // fall back to folding the stale pre-sleep baseline into the fresh day's usage.
         tracker.RecordHeartbeat(idle: TimeSpan.Zero);
 
         Assert.False(tracker.IsOverLimit);
@@ -204,8 +268,7 @@ public class SessionTrackerTests
         var tracker = new SessionTracker(clock, limit: TimeSpan.FromMinutes(120), idleResetThreshold: TimeSpan.FromSeconds(60), breakInterval: TimeSpan.FromMinutes(30));
 
         tracker.RecordHeartbeat(idle: TimeSpan.Zero);
-        clock.Advance(TimeSpan.FromMinutes(30));
-        tracker.RecordHeartbeat(idle: TimeSpan.Zero);
+        SimulateActiveUse(tracker, clock, TimeSpan.FromMinutes(30), TimeSpan.FromSeconds(30));
 
         Assert.True(tracker.IsBreakDue);
     }
@@ -217,8 +280,7 @@ public class SessionTrackerTests
         var tracker = new SessionTracker(clock, limit: TimeSpan.FromMinutes(20), idleResetThreshold: TimeSpan.FromSeconds(60), breakInterval: TimeSpan.FromMinutes(10));
 
         tracker.RecordHeartbeat(idle: TimeSpan.Zero);
-        clock.Advance(TimeSpan.FromMinutes(20));
-        tracker.RecordHeartbeat(idle: TimeSpan.Zero);
+        SimulateActiveUse(tracker, clock, TimeSpan.FromMinutes(20), TimeSpan.FromSeconds(30));
 
         Assert.True(tracker.IsOverLimit);
         Assert.False(tracker.IsBreakDue);
@@ -231,8 +293,7 @@ public class SessionTrackerTests
         var tracker = new SessionTracker(clock, limit: TimeSpan.FromMinutes(120), idleResetThreshold: TimeSpan.FromSeconds(60), breakInterval: TimeSpan.FromMinutes(30));
 
         tracker.RecordHeartbeat(idle: TimeSpan.Zero);
-        clock.Advance(TimeSpan.FromMinutes(30));
-        tracker.RecordHeartbeat(idle: TimeSpan.Zero);
+        SimulateActiveUse(tracker, clock, TimeSpan.FromMinutes(30), TimeSpan.FromSeconds(30));
         Assert.True(tracker.IsBreakDue);
 
         tracker.ResetBreak();
