@@ -4,6 +4,7 @@ using H.NotifyIcon;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using WinRT.Interop;
 
 namespace KidsMonitor_Tray;
 
@@ -47,11 +48,17 @@ public partial class App : Application
         // when every user-facing window is closed. Parked off-screen and shrunk to 1x1 rather than
         // AppWindow.Hide(): Hide() left the window activated-but-invisible in a way that also
         // blocked later windows (Settings/Setup) from ever coming to the foreground when activated.
+        //
+        // IsShownInSwitchers only hides it from Alt+Tab -- it still gets a taskbar button, which
+        // the user can click and close, killing the whole Tray process along with it (the exact
+        // bug this window exists to prevent). HideFromTaskbar strips the taskbar button itself
+        // via the same raw Win32 styling approach the Overlay uses for its own window chrome.
         _keepAliveWindow = new Window();
         _keepAliveWindow.AppWindow.IsShownInSwitchers = false;
         _keepAliveWindow.AppWindow.Resize(new Windows.Graphics.SizeInt32(1, 1));
         _keepAliveWindow.AppWindow.Move(new Windows.Graphics.PointInt32(-32000, -32000));
         _keepAliveWindow.Activate();
+        HideFromTaskbar(WindowNative.GetWindowHandle(_keepAliveWindow));
 
         _trayIcon = (TaskbarIcon)Resources["TrayIcon"];
 
@@ -149,4 +156,39 @@ public partial class App : Application
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern int MessageBoxW(IntPtr hWnd, string text, string caption, uint type);
+
+    /// <summary>
+    /// Strips the taskbar button from an already-shown window. WS_EX_TOOLWINDOW/WS_EX_APPWINDOW
+    /// alone only take effect for a window's *first* show, so SetWindowPos with SWP_FRAMECHANGED
+    /// (no move/size/z-order/activation) is needed afterward to make the taskbar actually drop
+    /// the button for a window that's already been Activate()d.
+    /// </summary>
+    private static void HideFromTaskbar(IntPtr hwnd)
+    {
+        var exStyle = (long)GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+        exStyle = (exStyle & ~WS_EX_APPWINDOW) | WS_EX_TOOLWINDOW;
+        SetWindowLongPtrW(hwnd, GWL_EXSTYLE, (IntPtr)exStyle);
+
+        SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+    }
+
+    private const int GWL_EXSTYLE = -20;
+    private const long WS_EX_TOOLWINDOW = 0x00000080;
+    private const long WS_EX_APPWINDOW = 0x00040000;
+
+    private const uint SWP_NOSIZE = 0x0001;
+    private const uint SWP_NOMOVE = 0x0002;
+    private const uint SWP_NOZORDER = 0x0004;
+    private const uint SWP_NOACTIVATE = 0x0010;
+    private const uint SWP_FRAMECHANGED = 0x0020;
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW", SetLastError = true)]
+    private static extern IntPtr GetWindowLongPtrW(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)]
+    private static extern IntPtr SetWindowLongPtrW(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint uFlags);
 }
